@@ -143,4 +143,20 @@ Example response:
 }
 ```
 
-Vite dev proxy forwards `/api` requests to `http://localhost:5000`, allowing the frontend to call `apiClient.get('/api/health')` transparently without CORS friction.
+## 5. Demo & Test Credentials
+
+The database includes verified test accounts for evaluating role-based workflows:
+
+| Role | Email | Password | Allowed Surfaces |
+| :--- | :--- | :--- | :--- |
+| **Subscriber (User)** | `demo.user@example.com` | `DemoPassword123!` | `/dashboard`, Score logging, Charity preferences, Draw participation |
+| **Administrator** | `demo.admin@example.com` | `DemoAdmin123!` | `/admin`, Draw configuration/publishing, Winner verification, Payouts |
+
+---
+
+## 6. Phase 1 Verification Summary
+
+- **PostgreSQL Migrations:** Schema applied with 10 tables, check constraints, foreign keys, and indexes.
+- **Row Level Security (RLS):** Policies active on all public tables; user data strictly isolated.
+- **Authentication:** Supabase Auth session persistence with Bearer JWT verification on Express backend (`GET /api/auth/me`).
+- **Role Guards:** Normal users are restricted from `/admin` (redirected to `/unauthorized` 403 Forbidden); administrators have full verified access.

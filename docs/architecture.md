@@ -1,10 +1,10 @@
 # System Architecture Overview
 
-*Digital Heroes Architecture Document — Phase 0 Foundation*
+*Digital Heroes Architecture Document — Phase 1 Complete*
 
 ## 1. High-Level Architecture
 
-The platform uses a clean, decoupled client-server architecture:
+The platform uses a clean, decoupled client-server architecture with strict Row Level Security (RLS) and server-side authorization:
 
 ```
 ┌─────────────────────────────────────────────────────────────┐
@@ -12,57 +12,98 @@ The platform uses a clean, decoupled client-server architecture:
 │  React 18 + Vite + TypeScript + Tailwind CSS               │
 │  React Router · React Hook Form · Zod · Recharts · Lucide   │
 └──────────────────────────────┬──────────────────────────────┘
-                               │ HTTPS / JSON (Central Axios)
-                               ▼
-┌─────────────────────────────────────────────────────────────┐
-│                      Backend API Layer                      │
-│  Node.js + Express + TypeScript                             │
-│  Helmet · CORS · Morgan · Zod Validation · Error Handler    │
-└──────────────────────────────┬──────────────────────────────┘
                                │
-            ┌──────────────────┴──────────────────┐
-            ▼                                     ▼
-┌──────────────────────────────┐    ┌─────────────────────────┐
-│     Database & Auth Layer    │    │      Payment Layer      │
-│  Supabase PostgreSQL         │    │  Stripe Checkout        │
-│  Supabase Auth & Storage     │    │  Stripe Webhooks        │
-└──────────────────────────────┘    └─────────────────────────┘
+               ┌───────────────┴───────────────┐
+               │ 1. User Authenticates         │ 2. HTTPS / JSON with Bearer JWT
+               ▼                               ▼
+┌──────────────────────────────┐ ┌─────────────────────────────────────────────────────────────┐
+│       Supabase Auth          │ │                      Backend API Layer                      │
+│  Issue JWT Session           │ │  Node.js + Express + TypeScript                             │
+│  Auto-refresh token          │ │  Helmet · CORS · Morgan · Zod Validation · Error Handler    │
+└──────────────────────────────┘ └──────────────────────────────┬──────────────────────────────┘
+                                                                │ 3. authenticateUser verifies JWT
+                                                                │ 4. requireAdmin verifies role
+                                                                ▼
+                                 ┌─────────────────────────────────────────────────────────────┐
+                                 │                   Supabase PostgreSQL Layer                 │
+                                 │  Row Level Security (RLS) Enforced on ALL Tables            │
+                                 │  User isolation (auth.uid() = user_id)                      │
+                                 │  is_admin() superuser evaluation prevents recursion         │
+                                 └─────────────────────────────────────────────────────────────┘
 ```
 
 ---
 
-## 2. Layered Backend Design
-
-To guarantee maintainability and separation of concerns, the backend adheres to a strict layered structure:
+## 2. Authentication & Authorization Flow
 
 ```
-HTTP Request
-     │
-     ▼
-[ Route ]              - Maps URL endpoints and applies authentication/role guards
-     │
-     ▼
-[ Controller ]         - Parses inputs, invokes validators, formats HTTP responses
-     │
-     ▼
-[ Service ]            - Core business logic (score rolling, draw simulation, prize math)
-     │
-     ▼
-[ Repository ]         - Data access layer executing queries against Supabase PostgreSQL
-     │
-     ▼
-[ Supabase / Postgres ]- Persistent storage with constraints, indexes, and cascades
+Frontend (User enters email + password)
+   │
+   ▼
+Supabase Auth (Validates credentials, issues JWT access token)
+   │
+   ▼
+Access Token (Stored securely in client session via AuthContext)
+   │
+   ▼ (Automatically attached via Axios interceptor: Authorization: Bearer <token>)
+Express API Endpoint (e.g. GET /api/auth/me)
+   │
+   ▼
+Authentication Middleware (`authenticateUser`)
+   - Extracts Bearer token from header
+   - Calls `supabase.auth.getUser(token)` to verify signature with Auth server
+   - Populates `req.user = { id, email }` and `req.authToken = token`
+   │
+   ▼
+Authorization Middleware (`requireAdmin` for privileged endpoints)
+   - Queries `public.users` role for `req.user.id`
+   - Verifies `role === 'admin'`
+   - Rejects non-admin requests with HTTP 403 Forbidden
+   │
+   ▼
+Database Access Layer (`getUserSupabase(jwt)`)
+   - Uses user-scoped client carrying user Bearer JWT
+   - Respects PostgreSQL Row Level Security (RLS)
+   │
+   ▼
+PostgreSQL Engine
+   - RLS evaluates `auth.uid() = user_id`
+   - Data returned to Express & forwarded as standardized JSON to client
 ```
-
-### Guiding Principles
-1. **Zero Business Logic in Routes or Views:** Business rules (e.g. rolling 5 scores, jackpot rollover, winner validation) reside exclusively in backend service modules.
-2. **Never Trust Client Claims:** User identity, role (`USER` vs `ADMIN`), subscription status, and prize amounts are computed or validated server-side on every request.
-3. **Fail Safe Error Handling:** In production, stack traces are withheld from client responses; errors return standardized, actionable JSON envelopes.
 
 ---
 
-## 3. Communication Strategy
+## 3. Data Model Relationships
 
-- **Development:** The Vite development server runs on `http://localhost:5173` and proxies all `/api/*` traffic directly to the Express backend on `http://localhost:5000`. This eliminates CORS issues in development.
-- **Production:** Frontend static assets will be served via Vercel CDN, routing API requests to the backend deployed on Render.
-- **API Client:** The frontend uses a centralized Axios client (`src/services/api.ts`) with request interceptors for auth tokens and response interceptors for standardized error extraction.
+```
+auth.users (Supabase Managed Identity)
+    │
+    ▼ (1:1 via database trigger: handle_new_user)
+public.users
+    ├── subscriptions (1:N)
+    ├── scores (1:N)
+    ├── user_charity_preferences (1:1) ──► charities (N:1) ──► charity_events (1:N)
+    ├── draw_entries (1:N) ──────────────► draws (N:1)
+    ├── winners (1:N) ───────────────────► draws (N:1)
+    └── payments (1:N)
+```
+
+---
+
+## 4. Business Logic Boundaries Across Phases
+
+All critical business rules live exclusively on the backend in dedicated services:
+
+1. **Phase 2 — Public Platform & Charities**:
+   - Charity directory discovery & filtering service.
+2. **Phase 3 — Subscription & Score Engine**:
+   - `scoreService`: Enforces 1–45 point constraint, one score per date, and rolling-5 FIFO pruning (automatic deletion of oldest score upon 6th entry).
+   - `subscriptionService`: Manages subscription status transitions and checks subscriber eligibility.
+3. **Phase 4 — User Dashboard**:
+   - Aggregates user profile, active subscription, latest 5 scores, charity preference, and draw status.
+4. **Phase 5 — Draw & Prize Calculation Engine**:
+   - `drawService`: Generates 5 winning numbers in Random mode or weighted Algorithmic mode (weighted by monthly subscriber score frequency).
+   - `prizeService`: Calculates prize pool (50% subscription share + unclaimed 5-match jackpot rollover), splits ties across winners, and creates winner records.
+5. **Phase 6 — Admin Operations & Winner Verification**:
+   - `winnerService`: Admin proof verification (Pending &rarr; Approved/Rejected) and payout lifecycle (Pending &rarr; Paid).
+   - `adminService`: User management and platform analytics.

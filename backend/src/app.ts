@@ -4,6 +4,7 @@ import helmet from 'helmet';
 import morgan from 'morgan';
 import { config } from './config/index.js';
 import { healthRouter } from './routes/health.routes.js';
+import { authRouter } from './routes/auth.routes.js';
 import { errorHandler } from './middleware/errorHandler.js';
 
 export const createApp = (): Express => {
@@ -33,6 +34,7 @@ export const createApp = (): Express => {
 
   // Mount routes
   app.use('/api', healthRouter);
+  app.use('/api/auth', authRouter);
 
   // 404 handler for undefined routes
   app.use((_req, res) => {
