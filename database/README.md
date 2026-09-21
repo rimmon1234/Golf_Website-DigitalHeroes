@@ -1,47 +1,105 @@
-# Database & Data Layer Architecture
+# Digital Heroes Database Architecture & Migrations
 
-*Digital Heroes Database Specification — Phase 0 Foundation*
-
-## 1. Overview
-
-Digital Heroes utilizes **Supabase PostgreSQL** for its persistence layer. The database schema enforces data integrity at the database engine level (foreign keys, check constraints, unique constraints, and cascades).
-
-> **Important (Phase 0 Scope):** No database tables or seed records are created during Phase 0. Migrations and schema design will be executed in **Phase 1 (Database + Auth)**.
+This directory contains the PostgreSQL schema definitions, triggers, constraints, Row Level Security (RLS) policies, and seed data for the Digital Heroes platform.
 
 ---
 
-## 2. Planned Schema Architecture (Phase 1 Preview)
+## 1. Directory Structure
 
-The following relational entities are planned for implementation in Phase 1:
-
-1. **`users`**: Application user profiles mapped to `auth.users.id`.
-   - Fields: `id`, `auth_user_id`, `name`, `email`, `role ('USER' | 'ADMIN')`, `created_at`, `updated_at`.
-2. **`subscriptions`**: Active and historical billing status.
-   - Fields: `id`, `user_id`, `plan_type ('MONTHLY' | 'YEARLY')`, `status ('active' | 'past_due' | 'cancelled')`, `stripe_customer_id`, `stripe_subscription_id`, `start_date`, `renewal_date`, `cancelled_at`, `created_at`, `updated_at`.
-3. **`charities`**: Registered charity organizations.
-   - Fields: `id`, `name`, `description`, `category`, `image_url`, `featured`, `active`, `created_at`, `updated_at`.
-4. **`charity_events`**: Events organized by charities (e.g., charity golf days).
-   - Fields: `id`, `charity_id`, `title`, `description`, `event_date`, `created_at`.
-5. **`user_charity_preferences`**: User-selected charity and contribution allocation.
-   - Fields: `id`, `user_id`, `charity_id`, `contribution_percentage` (CHECK >= 10), `created_at`, `updated_at`.
-6. **`scores`**: User Stableford golf scores.
-   - Fields: `id`, `user_id`, `score` (CHECK 1 <= score <= 45), `score_date`, `created_at`, `updated_at`.
-   - Constraints: `UNIQUE(user_id, score_date)`.
-   - Logic: Pruned via rolling-5 FIFO in backend service.
-7. **`draws`**: Monthly draw records.
-   - Fields: `id`, `draw_month`, `draw_type ('RANDOM' | 'ALGORITHMIC')`, `status ('DRAFT' | 'SIMULATED' | 'PUBLISHED')`, `winning_numbers (int[])`, `prize_pool`, `published_at`, `created_at`.
-8. **`draw_entries`**: User entries associated with each monthly draw.
-   - Fields: `id`, `draw_id`, `user_id`, `selected_numbers (int[])`, `created_at`.
-9. **`winners`**: Detected winners for published draws.
-   - Fields: `id`, `draw_id`, `user_id`, `match_type (3 | 4 | 5)`, `prize_amount`, `proof_url`, `verification_status ('PENDING' | 'APPROVED' | 'REJECTED')`, `payout_status ('PENDING' | 'PAID')`, `verified_at`, `paid_at`, `created_at`.
-10. **`payments`**: Payment audit history.
-    - Fields: `id`, `user_id`, `stripe_payment_id`, `amount`, `currency`, `payment_type`, `status`, `created_at`.
+```
+database/
+├── migrations/
+│   ├── 001_initial_schema.sql    # Tables, relationships, check constraints, indexes, triggers
+│   ├── 002_rls_policies.sql      # Row Level Security (RLS) policies and admin helper
+│   └── 003_seed.sql              # Non-auth seed data (verified charities & charity events)
+├── seed.sql                      # Copy of non-auth seed data
+└── README.md                     # Documentation & setup guide
+```
 
 ---
 
-## 3. Migration Workflow (Phase 1)
+## 2. Table Relationships Overview
 
-When Phase 1 begins:
-1. SQL migration scripts will be located in `database/migrations/`.
-2. Migrations can be applied directly using the Supabase SQL Editor or the Supabase CLI (`supabase db push`).
-3. Seed data will be populated via `database/seed.sql`.
+```
+auth.users (Supabase Managed)
+    │
+    ▼ (1:1 via trigger)
+public.users
+    ├── subscriptions (1:N)
+    ├── scores (1:N)
+    ├── user_charity_preferences (1:1) ──► charities (N:1) ──► charity_events (1:N)
+    ├── draw_entries (1:N) ──────────────► draws (N:1)
+    ├── winners (1:N) ───────────────────► draws (N:1)
+    └── payments (1:N)
+```
+
+### Table Reference
+
+| Table | Primary Key | Key Constraints & Rules |
+| :--- | :--- | :--- |
+| `public.users` | `id UUID` (FK to `auth.users.id`) | Role `CHECK (role IN ('user', 'admin'))`. Defaults to `user`. Protected against client escalation. |
+| `public.subscriptions` | `id UUID` | `user_id` (FK to `users`), `plan_type` ('monthly'/'yearly'), lifecycle status states. |
+| `public.scores` | `id UUID` | `CHECK (score >= 1 AND score <= 45)`, `UNIQUE(user_id, score_date)`. One score per date. |
+| `public.charities` | `id UUID` | `name` UNIQUE, category, active & featured flags. |
+| `public.charity_events` | `id UUID` | `charity_id` (FK to `charities` ON DELETE CASCADE), event date, title. |
+| `public.user_charity_preferences` | `id UUID` | `UNIQUE(user_id)` (one active preference), `CHECK (contribution_percentage >= 10.00 AND <= 100.00)`. |
+| `public.draws` | `id UUID` | `UNIQUE(draw_month)`, status ('draft', 'simulated', 'published', 'completed'), winning numbers, prize pool & rollover. |
+| `public.draw_entries` | `id UUID` | `UNIQUE(draw_id, user_id)` (one entry per user per draw), selected 5 numbers. |
+| `public.winners` | `id UUID` | `UNIQUE(draw_id, user_id, match_type)`, status ('pending', 'approved', 'rejected'), payout ('pending', 'paid'). |
+| `public.payments` | `id UUID` | Audit ledger of payments, type ('subscription', 'charity_donation', 'prize_payout'), status. |
+
+---
+
+## 3. How to Apply Migrations
+
+### Option A: Supabase Web Dashboard (Recommended for Quick Setup)
+1. Open your project on [supabase.com](https://supabase.com).
+2. Navigate to the **SQL Editor** tab.
+3. Run the migrations in sequential order:
+   - Paste and execute `database/migrations/001_initial_schema.sql`
+   - Paste and execute `database/migrations/002_rls_policies.sql`
+   - Paste and execute `database/migrations/003_seed.sql`
+
+### Option B: Supabase CLI
+```bash
+supabase link --project-ref <your-project-id>
+supabase db push
+```
+
+---
+
+## 4. Automatic User Profile Creation (`auth.users` &rarr; `public.users`)
+
+When a user registers through Supabase Auth (client or API), the `on_auth_user_created` trigger fires `public.handle_new_user()`:
+1. It copies `NEW.id` &rarr; `public.users.id`.
+2. Extracts `full_name` and `avatar_url` from `NEW.raw_user_meta_data`.
+3. **Security Enforcement:** Role is hardcoded to `'user'`. Any attempt by the client to inject `role: 'admin'` inside user metadata is ignored.
+4. The `trg_prevent_role_escalation` trigger blocks any direct client `UPDATE` from modifying the `role` column.
+
+---
+
+## 5. Row Level Security (RLS) Strategy
+
+Every application table in the `public` schema has RLS strictly enabled:
+- **`public.is_admin()` Helper:** Declared with `SECURITY DEFINER` and safe `search_path = public, pg_temp`. It evaluates with superuser privileges, completely preventing recursion loops on `public.users`.
+- **User Data Isolation:** Users can only `SELECT`, `INSERT`, `UPDATE`, or `DELETE` their own rows (`auth.uid() = user_id`).
+- **Tamper Prevention:**
+  - `subscriptions`: Normal users cannot write or mark subscriptions active.
+  - `winners`: Normal users cannot alter prize amounts or mark payouts as paid.
+  - `payments`: Normal users cannot create fake payment records.
+  - `draws`: Non-admin users can only view draws that have `status = 'published'`.
+
+---
+
+## 6. Admin Role Promotion (Safe Workflow)
+
+Because role escalation cannot be performed from the frontend:
+1. Register the admin user through the standard signup flow (e.g., `admin@digitalheroes.com`).
+2. Verify the user's email or confirm it in the Supabase Auth dashboard.
+3. In the Supabase SQL Editor, run:
+```sql
+UPDATE public.users
+SET role = 'admin'
+WHERE email = 'admin@digitalheroes.com';
+```
+This safely grants administrative access without exposing private keys or creating vulnerable client endpoints.

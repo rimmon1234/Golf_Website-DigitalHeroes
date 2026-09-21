@@ -13,6 +13,7 @@ const envSchema = z.object({
   NODE_ENV: z.enum(['development', 'production', 'test']).default('development'),
   CLIENT_URL: z.string().default('http://localhost:5173'),
   SUPABASE_URL: z.string().optional().default(''),
+  SUPABASE_PUBLISHABLE_KEY: z.string().optional().default(''),
   SUPABASE_SECRET_KEY: z.string().optional().default(''),
   STRIPE_SECRET_KEY: z.string().optional().default(''),
   STRIPE_WEBHOOK_SECRET: z.string().optional().default('')
