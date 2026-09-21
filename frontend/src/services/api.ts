@@ -1,5 +1,6 @@
 import axios, { AxiosInstance, AxiosResponse, AxiosError, InternalAxiosRequestConfig } from 'axios';
 import { UserProfile } from '../types/auth.js';
+import { Charity, CharityDetail, CharityEvent } from '../types/charity.js';
 
 // Base URL falls back to relative '/api' for Vite dev proxy forwarding
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || '/api';
@@ -69,4 +70,58 @@ export const fetchCurrentUserProfile = async (token?: string): Promise<UserProfi
   const endpoint = API_BASE_URL.endsWith('/api') ? '/auth/me' : '/api/auth/me';
   const response = await apiClient.get<AuthMeResponse>(endpoint);
   return response.data.data.user;
+};
+
+/* ====================================================================
+   CHARITIES SERVICE
+   ==================================================================== */
+
+export interface CharitiesListResponse {
+  status: string;
+  data: {
+    charities: Charity[];
+    count: number;
+  };
+}
+
+export interface CharityDetailResponse {
+  status: string;
+  data: {
+    charity: CharityDetail;
+  };
+}
+
+export interface CharityEventsResponse {
+  status: string;
+  data: {
+    events: CharityEvent[];
+    count: number;
+  };
+}
+
+/**
+ * Fetches all active charities from the backend API.
+ */
+export const getCharities = async (): Promise<Charity[]> => {
+  const endpoint = API_BASE_URL.endsWith('/api') ? '/charities' : '/api/charities';
+  const response = await apiClient.get<CharitiesListResponse>(endpoint);
+  return response.data.data.charities;
+};
+
+/**
+ * Fetches a single active charity with associated events by ID.
+ */
+export const getCharityById = async (id: string): Promise<CharityDetail> => {
+  const endpoint = API_BASE_URL.endsWith('/api') ? `/charities/${id}` : `/api/charities/${id}`;
+  const response = await apiClient.get<CharityDetailResponse>(endpoint);
+  return response.data.data.charity;
+};
+
+/**
+ * Fetches events for a specific active charity.
+ */
+export const getCharityEvents = async (id: string): Promise<CharityEvent[]> => {
+  const endpoint = API_BASE_URL.endsWith('/api') ? `/charities/${id}/events` : `/api/charities/${id}/events`;
+  const response = await apiClient.get<CharityEventsResponse>(endpoint);
+  return response.data.data.events;
 };
