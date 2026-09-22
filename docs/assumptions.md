@@ -45,14 +45,36 @@ The PRD states: "Users select a charity at signup; Minimum contribution: 10% of 
 
 ---
 
-## 4. Golf Scoring Mechanics (Stableford Format)
+## 4. Golf Scoring Mechanics (Stableford Format) & Phase 3 Rules
 
 The PRD mandates:
-- Scores between 1 and 45 points.
+- Stableford scores strictly between 1 and 45 points (integers only).
 - Exactly one score permitted per user per date (`UNIQUE(user_id, score_date)`).
-- Only the latest 5 scores are retained.
-- When a 6th score is entered, the oldest score is pruned automatically (FIFO rolling-5).
+- Duplicate score dates are rejected with HTTP 409 Conflict.
+- Only the latest 5 scores are retained per user.
+- When a 6th score is entered, the oldest retained score is removed automatically.
 - Scores display in reverse chronological order (newest first).
+
+### Phase 3 Key Decisions & Ambiguity Resolution:
+1. **Definition of "Latest 5" Scores:**
+   - Interpreted canonically as the five most recent scores ordered by `score_date DESC, created_at DESC`.
+   - `score_date` is the canonical ordering attribute because golf performance is inherently chronological.
+2. **Backdated Score Behavior:**
+   - If a user enters a backdated score older than their current 5 retained scores, the record is inserted, the rolling-5 rule is evaluated against `score_date DESC`, and any records outside the top 5 are pruned. Thus, a backdated score older than all 5 retained scores will not remain in the retained set.
+3. **No Official Golf Handicap System:**
+   - The PRD does not define WHS, USGA formulas, slope/course ratings, or handicap differentials.
+   - The platform strictly avoids claiming or displaying an official "handicap". Instead, a non-official, transparent metric—**"Recent Score Average"**—is calculated as the simple arithmetic mean of the user's retained Stableford scores.
+4. **Course Name Requirement:**
+   - The PRD requires score and date. Course name is not explicitly required by the PRD.
+   - Core score logging operates with score and date.
+5. **Subscription Gating Deferred to Phase 4:**
+   - Real Stripe subscription checkout, billing cycles, and subscription gating belong to Phase 4.
+   - For Phase 3, standard Supabase JWT authentication is enforced on all score and charity preference routes. No mock or fake subscription flags are created.
+6. **Charity Contribution Percentage as Saved Preference:**
+   - The user's chosen charity and contribution percentage (10% minimum up to 100%) represent a saved allocation preference for future subscription billing.
+   - No monetary charges or donation deductions occur in Phase 3.
+7. **Temporary Test Data Cleanup:**
+   - Test score records generated during verification suites are automatically purged after tests conclude, leaving live database tables clean.
 
 ---
 
