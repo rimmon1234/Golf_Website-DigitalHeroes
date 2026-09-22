@@ -6,6 +6,8 @@ import { config } from './config/index.js';
 import { healthRouter } from './routes/health.routes.js';
 import { authRouter } from './routes/auth.routes.js';
 import { charityRouter } from './routes/charity.routes.js';
+import { scoreRouter } from './routes/score.routes.js';
+import { charityPreferenceRouter } from './routes/charityPreference.routes.js';
 import { errorHandler } from './middleware/errorHandler.js';
 
 export const createApp = (): Express => {
@@ -37,6 +39,8 @@ export const createApp = (): Express => {
   app.use('/api', healthRouter);
   app.use('/api/auth', authRouter);
   app.use('/api/charities', charityRouter);
+  app.use('/api/scores', scoreRouter);
+  app.use('/api/charity-preference', charityPreferenceRouter);
 
   // 404 handler for undefined routes
   app.use((_req, res) => {

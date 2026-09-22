@@ -1,6 +1,18 @@
 import axios, { AxiosInstance, AxiosResponse, AxiosError, InternalAxiosRequestConfig } from 'axios';
 import { UserProfile } from '../types/auth.js';
 import { Charity, CharityDetail, CharityEvent } from '../types/charity.js';
+import {
+  Score,
+  CreateScoreInput,
+  UpdateScoreInput,
+  ScoresListResponse,
+  ScoreMutationResponse
+} from '../types/score.js';
+import {
+  UserCharityPreference,
+  UpdateCharityPreferenceInput,
+  CharityPreferenceResponse
+} from '../types/charityPreference.js';
 
 // Base URL falls back to relative '/api' for Vite dev proxy forwarding
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || '/api';
@@ -125,3 +137,76 @@ export const getCharityEvents = async (id: string): Promise<CharityEvent[]> => {
   const response = await apiClient.get<CharityEventsResponse>(endpoint);
   return response.data.data.events;
 };
+
+/* ====================================================================
+   SCORES SERVICE (Phase 3)
+   ==================================================================== */
+
+/**
+ * Fetches the authenticated user's retained Stableford scores (max 5, score_date DESC).
+ */
+export const getScores = async (): Promise<Score[]> => {
+  const endpoint = API_BASE_URL.endsWith('/api') ? '/scores' : '/api/scores';
+  const response = await apiClient.get<ScoresListResponse>(endpoint);
+  return response.data.data.scores;
+};
+
+/**
+ * Submits a new Stableford score and enforces the rolling-five rule.
+ */
+export const addScore = async (data: CreateScoreInput): Promise<{ added: Score; scores: Score[] }> => {
+  const endpoint = API_BASE_URL.endsWith('/api') ? '/scores' : '/api/scores';
+  const response = await apiClient.post<ScoreMutationResponse>(endpoint, data);
+  return {
+    added: response.data.data.added!,
+    scores: response.data.data.scores
+  };
+};
+
+/**
+ * Updates an existing score value or date.
+ */
+export const updateScore = async (
+  id: string,
+  data: UpdateScoreInput
+): Promise<{ score: Score; scores: Score[] }> => {
+  const endpoint = API_BASE_URL.endsWith('/api') ? `/scores/${id}` : `/api/scores/${id}`;
+  const response = await apiClient.patch<ScoreMutationResponse>(endpoint, data);
+  return {
+    score: response.data.data.score!,
+    scores: response.data.data.scores
+  };
+};
+
+/**
+ * Deletes a user score.
+ */
+export const deleteScore = async (id: string): Promise<void> => {
+  const endpoint = API_BASE_URL.endsWith('/api') ? `/scores/${id}` : `/api/scores/${id}`;
+  await apiClient.delete(endpoint);
+};
+
+/* ====================================================================
+   CHARITY PREFERENCE SERVICE (Phase 3)
+   ==================================================================== */
+
+/**
+ * Fetches the authenticated user's selected charity preference.
+ */
+export const getCharityPreference = async (): Promise<UserCharityPreference | null> => {
+  const endpoint = API_BASE_URL.endsWith('/api') ? '/charity-preference' : '/api/charity-preference';
+  const response = await apiClient.get<CharityPreferenceResponse>(endpoint);
+  return response.data.data.preference;
+};
+
+/**
+ * Updates or sets the user's single charity preference and contribution percentage.
+ */
+export const updateCharityPreference = async (
+  data: UpdateCharityPreferenceInput
+): Promise<UserCharityPreference> => {
+  const endpoint = API_BASE_URL.endsWith('/api') ? '/charity-preference' : '/api/charity-preference';
+  const response = await apiClient.put<CharityPreferenceResponse>(endpoint, data);
+  return response.data.data.preference!;
+};
+

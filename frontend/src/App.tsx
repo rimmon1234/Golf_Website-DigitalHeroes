@@ -10,6 +10,8 @@ import CharityDetailPage from './pages/public/CharityDetailPage.tsx';
 import Login from './pages/auth/Login.tsx';
 import Signup from './pages/auth/Signup.tsx';
 import DashboardPlaceholder from './pages/protected/DashboardPlaceholder.tsx';
+import ScoresPage from './pages/protected/ScoresPage.tsx';
+import MyCharityPage from './pages/protected/MyCharityPage.tsx';
 import AdminPlaceholder from './pages/protected/AdminPlaceholder.tsx';
 import Unauthorized from './pages/public/Unauthorized.tsx';
 import NotFound from './pages/public/NotFound.tsx';
@@ -30,12 +32,28 @@ export const App: React.FC = () => {
           <Route path="/signup" element={<Signup />} />
           <Route path="/unauthorized" element={<Unauthorized />} />
 
-          {/* Protected User Routes (Phase 1 verified, Phase 3+ to expand) */}
+          {/* Protected User Routes (Phase 1 & Phase 3) */}
           <Route
             path="/dashboard"
             element={
               <ProtectedRoute>
                 <DashboardPlaceholder />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/scores"
+            element={
+              <ProtectedRoute>
+                <ScoresPage />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/my-charity"
+            element={
+              <ProtectedRoute>
+                <MyCharityPage />
               </ProtectedRoute>
             }
           />

@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { useAuth } from '../../hooks/useAuth.ts';
-import { Menu, X, User, LogOut, Shield, LogIn, ArrowRight } from 'lucide-react';
+import { Menu, X, User, LogOut, Shield, LogIn, ArrowRight, Trophy, Heart } from 'lucide-react';
 
 export const Navbar: React.FC = () => {
   const [mobileMenuOpen, setMobileMenuOpen] = useState<boolean>(false);
@@ -87,14 +87,38 @@ export const Navbar: React.FC = () => {
             <div className="flex items-center gap-2">
               <Link
                 to="/dashboard"
-                className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl text-xs font-semibold bg-brand-500/10 text-brand-300 border border-brand-500/20 hover:bg-brand-500/20 transition"
+                className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-semibold transition ${
+                  isActive('/dashboard')
+                    ? 'bg-slate-800 text-brand-300'
+                    : 'text-slate-300 hover:text-white hover:bg-slate-900'
+                }`}
               >
                 <User className="w-3.5 h-3.5" /> Dashboard
+              </Link>
+              <Link
+                to="/scores"
+                className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-semibold transition ${
+                  isActive('/scores')
+                    ? 'bg-slate-800 text-brand-300'
+                    : 'text-slate-300 hover:text-white hover:bg-slate-900'
+                }`}
+              >
+                <Trophy className="w-3.5 h-3.5 text-brand-400" /> My Scores
+              </Link>
+              <Link
+                to="/my-charity"
+                className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-semibold transition ${
+                  isActive('/my-charity')
+                    ? 'bg-slate-800 text-brand-300'
+                    : 'text-slate-300 hover:text-white hover:bg-slate-900'
+                }`}
+              >
+                <Heart className="w-3.5 h-3.5 text-rose-400" /> My Charity
               </Link>
               {profile?.role === 'admin' && (
                 <Link
                   to="/admin"
-                  className="inline-flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-semibold bg-purple-500/10 text-purple-300 border border-purple-500/20 hover:bg-purple-500/20 transition"
+                  className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-semibold bg-purple-500/10 text-purple-300 border border-purple-500/20 hover:bg-purple-500/20 transition"
                 >
                   <Shield className="w-3.5 h-3.5 text-purple-400" /> Admin
                 </Link>
@@ -102,7 +126,7 @@ export const Navbar: React.FC = () => {
               <button
                 onClick={handleSignOut}
                 title="Sign out of your account"
-                className="inline-flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-medium text-slate-400 hover:text-slate-200 hover:bg-slate-900 border border-transparent hover:border-slate-800 transition cursor-pointer"
+                className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-medium text-slate-400 hover:text-slate-200 hover:bg-slate-900 border border-transparent hover:border-slate-800 transition cursor-pointer"
               >
                 <LogOut className="w-3.5 h-3.5" />
               </button>
@@ -174,6 +198,18 @@ export const Navbar: React.FC = () => {
                   className="flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl text-sm font-semibold bg-brand-500/10 text-brand-300 border border-brand-500/20"
                 >
                   <User className="w-4 h-4" /> Go to Dashboard
+                </Link>
+                <Link
+                  to="/scores"
+                  className="flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl text-sm font-medium text-slate-300 bg-slate-900 hover:bg-slate-800"
+                >
+                  <Trophy className="w-4 h-4 text-brand-400" /> My Scores
+                </Link>
+                <Link
+                  to="/my-charity"
+                  className="flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl text-sm font-medium text-slate-300 bg-slate-900 hover:bg-slate-800"
+                >
+                  <Heart className="w-4 h-4 text-rose-400" /> My Charity Partner
                 </Link>
                 {profile?.role === 'admin' && (
                   <Link
