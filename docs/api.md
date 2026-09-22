@@ -201,12 +201,155 @@ All score endpoints require an authenticated user session (`Authorization: Beare
 
 ---
 
-## 3. Planned REST Endpoints (Phases 4–6)
+## 3. Implemented Phase 4 Endpoints: Subscriptions & Stripe Payments
 
-### Subscriptions & Payments (`/api/subscriptions`, `/api/payments`)
-- `POST /api/subscriptions/checkout` — Create Stripe Checkout session for monthly/yearly plans.
-- `GET  /api/subscriptions/status` — Get verified subscription state.
-- `POST /api/payments/webhook` — Stripe webhook handler for lifecycle events.
+All subscription management endpoints require an authenticated user session (`Authorization: Bearer <supabase_jwt>`). The webhook endpoint is public and secured via cryptographic Stripe HMAC-SHA256 signature verification.
+
+### 1. Create Checkout Session
+Creates a Stripe Checkout Session for a monthly or yearly subscription plan.
+- **URL:** `/api/subscriptions/checkout`
+- **Method:** `POST`
+- **Auth Required:** Yes (`Bearer <token>`)
+- **Request Body:**
+```json
+{
+  "planType": "monthly" // or "yearly"
+}
+```
+- **Response (200 OK):**
+```json
+{
+  "status": "ok",
+  "data": {
+    "sessionId": "cs_test_a1b2c3...",
+    "checkoutUrl": "https://checkout.stripe.com/c/pay/cs_test_a1b2c3..."
+  }
+}
+```
+- **Error Responses:**
+  - `400 Bad Request`: Invalid `planType` (must be `monthly` or `yearly`).
+  - `401 Unauthorized`: Missing or invalid JWT.
+  - `503 Service Unavailable`: Stripe not configured on server.
+
+### 2. Retrieve My Subscription & Payment History
+Returns the authenticated member's active subscription status, period dates, cancellation status, and past payments.
+- **URL:** `/api/subscriptions/me`
+- **Method:** `GET`
+- **Auth Required:** Yes (`Bearer <token>`)
+- **Response (200 OK):**
+```json
+{
+  "status": "ok",
+  "data": {
+    "subscription": {
+      "id": "22222222-3333-4444-5555-666666666666",
+      "user_id": "99999999-8888-7777-6666-555555555555",
+      "plan_type": "monthly",
+      "status": "active",
+      "stripe_customer_id": "cus_N98...",
+      "stripe_subscription_id": "sub_1Q...",
+      "current_period_start": "2026-09-22T14:00:00.000Z",
+      "current_period_end": "2026-10-22T14:00:00.000Z",
+      "cancel_at_period_end": false,
+      "cancelled_at": null,
+      "created_at": "2026-09-22T14:00:00.000Z",
+      "updated_at": "2026-09-22T14:00:00.000Z"
+    },
+    "isActive": true,
+    "payments": [
+      {
+        "id": "33333333-4444-5555-6666-777777777777",
+        "amount": 19.00,
+        "currency": "USD",
+        "payment_type": "subscription",
+        "status": "paid",
+        "paid_at": "2026-09-22T14:00:00.000Z",
+        "created_at": "2026-09-22T14:00:00.000Z"
+      }
+    ]
+  }
+}
+```
+
+### 3. Cancel Subscription at Period End
+Schedules subscription cancellation at the end of the current billing cycle. Access remains active until `current_period_end`.
+- **URL:** `/api/subscriptions/cancel`
+- **Method:** `POST`
+- **Auth Required:** Yes (`Bearer <token>`)
+- **Response (200 OK):**
+```json
+{
+  "status": "ok",
+  "message": "Subscription scheduled to cancel at end of billing period",
+  "data": {
+    "subscription": {
+      "cancel_at_period_end": true,
+      "cancelled_at": "2026-09-22T14:00:00.000Z",
+      ...
+    }
+  }
+}
+```
+
+### 4. Reactivate Subscription
+Reverses a scheduled cancellation before the current billing period expires.
+- **URL:** `/api/subscriptions/reactivate`
+- **Method:** `POST`
+- **Auth Required:** Yes (`Bearer <token>`)
+- **Response (200 OK):**
+```json
+{
+  "status": "ok",
+  "message": "Subscription successfully reactivated",
+  "data": {
+    "subscription": {
+      "cancel_at_period_end": false,
+      "cancelled_at": null,
+      ...
+    }
+  }
+}
+```
+
+### 5. Customer Portal Session
+Creates a Stripe Customer Portal link for updating credit card payment methods and downloading receipts.
+- **URL:** `/api/subscriptions/portal`
+- **Method:** `POST`
+- **Auth Required:** Yes (`Bearer <token>`)
+- **Response (200 OK):**
+```json
+{
+  "status": "ok",
+  "data": {
+    "url": "https://billing.stripe.com/p/session/..."
+  }
+}
+```
+
+### 6. Stripe Webhook Listener
+Receives asynchronous lifecycle events from Stripe. Signature is verified against the raw request body.
+- **URL:** `/api/payments/webhook`
+- **Method:** `POST`
+- **Auth Required:** No (Public endpoint verified via `Stripe-Signature` header HMAC-SHA256)
+- **Supported Events:**
+  - `checkout.session.completed`
+  - `customer.subscription.created`
+  - `customer.subscription.updated`
+  - `customer.subscription.deleted`
+  - `invoice.paid` (persists payment record & snapshots charity allocation)
+  - `invoice.payment_failed`
+- **Response (200 OK):**
+```json
+{
+  "received": true,
+  "handled": true,
+  "message": "Event customer.subscription.created processed successfully"
+}
+```
+
+---
+
+## 4. Planned REST Endpoints (Phases 5–6)
 
 ### Draws & Results (`/api/draws`)
 - `GET  /api/draws` — List published draws and winning history.
@@ -223,3 +366,4 @@ All score endpoints require an authenticated user session (`Authorization: Beare
 ### Admin Operations (`/api/admin`)
 - `GET /api/admin/users` — Search and manage user accounts.
 - `GET /api/admin/analytics` — Platform metrics (subscribers, prize pool, charity totals).
+

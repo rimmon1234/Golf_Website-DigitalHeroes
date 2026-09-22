@@ -1,5 +1,6 @@
 import { Router } from 'express';
 import { authenticateUser } from '../middleware/auth.middleware.js';
+import { requireActiveSubscription } from '../middleware/subscription.middleware.js';
 import {
   getScores,
   addScore,
@@ -9,8 +10,9 @@ import {
 
 export const scoreRouter = Router();
 
-// All score routes are strictly authenticated
+// All score routes are strictly authenticated and require an active subscription
 scoreRouter.use(authenticateUser);
+scoreRouter.use(requireActiveSubscription);
 
 scoreRouter.get('/', getScores);
 scoreRouter.post('/', addScore);

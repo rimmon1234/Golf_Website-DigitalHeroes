@@ -97,3 +97,38 @@ The PRD mandates:
 
 - Frontend applications have access strictly to public/publishable credentials (`VITE_SUPABASE_PUBLISHABLE_KEY`, `VITE_API_BASE_URL`).
 - All privileged operations (database mutations, administrative roles, draw simulations, Stripe checkout sessions, winner payouts) are strictly executed on the Express backend via verified server-side authentication.
+
+---
+
+## 7. Phase 4 Subscriptions & Stripe Payments Decisions
+
+1. **Pricing Amounts & Plan Structure:**
+   - Monthly Plan: **$19.00 USD / month**
+   - Yearly Plan: **$190.00 USD / year** ($38/year savings vs. monthly, 2 months free equivalent)
+   - Currency: USD (centralized across backend and frontend).
+
+2. **Server-Side Price IDs:**
+   - Price IDs are NEVER exposed to or selected by client requests.
+   - Client sends `{ planType: 'monthly' | 'yearly' }`.
+   - Backend resolves `STRIPE_MONTHLY_PRICE_ID` or `STRIPE_YEARLY_PRICE_ID` strictly on the server side.
+
+3. **Cancellation & Access Retention:**
+   - When a user cancels their subscription (`POST /api/subscriptions/cancel`), Stripe is updated with `cancel_at_period_end: true`.
+   - The user retains **full active member access** to scores, charity preferences, and monthly prize draws until `current_period_end`.
+   - A user may reactivate at any time prior to `current_period_end` without re-entering payment information (`POST /api/subscriptions/reactivate`).
+   - Only after `current_period_end` passes or `customer.subscription.deleted` is received is the subscription marked `cancelled` and member feature access blocked.
+
+4. **Stripe Webhook Raw Body Requirement:**
+   - Stripe signature verification requires the exact, unparsed request bytes.
+   - The route `/api/payments/webhook` is mounted with `express.raw({ type: 'application/json' })` strictly before global `express.json()`.
+   - Webhook signatures are verified using `stripe.webhooks.constructEvent` with HMAC-SHA256.
+
+5. **Sandbox & Test Mode Safety:**
+   - All Stripe operations operate in test mode (`sk_test_...` / `whsec_...`).
+   - If mock test keys are configured without live Stripe connectivity, graceful sandbox mode simulates customer creation and checkout redirects to `/subscription/success` so development and automated tests run seamlessly.
+   - No real credit card charges, no live payouts, and no actual bank disbursements occur.
+
+6. **Charity Contribution Accounting:**
+   - When an `invoice.paid` webhook event is processed, the user's current charity and contribution percentage (e.g., 20% of $19 = $3.80) are recorded in `subscription_charity_allocations`.
+   - This represents application accounting / audit ledger data only; no automatic third-party bank transfers are initiated in Level 1.
+

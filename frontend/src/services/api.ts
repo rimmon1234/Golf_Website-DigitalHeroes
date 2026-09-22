@@ -210,3 +210,90 @@ export const updateCharityPreference = async (
   return response.data.data.preference!;
 };
 
+/* ====================================================================
+   SUBSCRIPTIONS & BILLING SERVICE (Phase 4)
+   ==================================================================== */
+
+interface CheckoutApiResponse {
+  status: string;
+  data: {
+    checkoutUrl: string;
+    sessionId: string;
+  };
+}
+
+interface SubscriptionApiResponse {
+  status: string;
+  data: {
+    subscription: import('../types/subscription.js').Subscription | null;
+    isActive: boolean;
+    payments: import('../types/subscription.js').PaymentRecord[];
+  };
+}
+
+interface SubscriptionMutationResponse {
+  status: string;
+  message?: string;
+  data: {
+    subscription: import('../types/subscription.js').Subscription;
+  };
+}
+
+interface PortalApiResponse {
+  status: string;
+  data: {
+    portalUrl: string;
+  };
+}
+
+/**
+ * Creates a Stripe Checkout Session for subscription.
+ */
+export const createCheckoutSession = async (
+  planType: 'monthly' | 'yearly'
+): Promise<{ checkoutUrl: string; sessionId: string }> => {
+  const endpoint = API_BASE_URL.endsWith('/api') ? '/subscriptions/checkout' : '/api/subscriptions/checkout';
+  const response = await apiClient.post<CheckoutApiResponse>(endpoint, { planType });
+  return response.data.data;
+};
+
+/**
+ * Retrieves the authenticated user's current subscription status and payment history.
+ */
+export const getMySubscription = async (): Promise<{
+  subscription: import('../types/subscription.js').Subscription | null;
+  isActive: boolean;
+  payments: import('../types/subscription.js').PaymentRecord[];
+}> => {
+  const endpoint = API_BASE_URL.endsWith('/api') ? '/subscriptions/me' : '/api/subscriptions/me';
+  const response = await apiClient.get<SubscriptionApiResponse>(endpoint);
+  return response.data.data;
+};
+
+/**
+ * Schedules subscription cancellation at the end of the billing period.
+ */
+export const cancelSubscription = async (): Promise<import('../types/subscription.js').Subscription> => {
+  const endpoint = API_BASE_URL.endsWith('/api') ? '/subscriptions/cancel' : '/api/subscriptions/cancel';
+  const response = await apiClient.post<SubscriptionMutationResponse>(endpoint);
+  return response.data.data.subscription;
+};
+
+/**
+ * Reactivates a subscription pending cancellation.
+ */
+export const reactivateSubscription = async (): Promise<import('../types/subscription.js').Subscription> => {
+  const endpoint = API_BASE_URL.endsWith('/api') ? '/subscriptions/reactivate' : '/api/subscriptions/reactivate';
+  const response = await apiClient.post<SubscriptionMutationResponse>(endpoint);
+  return response.data.data.subscription;
+};
+
+/**
+ * Generates a Stripe Customer Portal session URL.
+ */
+export const createCustomerPortalSession = async (): Promise<string> => {
+  const endpoint = API_BASE_URL.endsWith('/api') ? '/subscriptions/portal' : '/api/subscriptions/portal';
+  const response = await apiClient.post<PortalApiResponse>(endpoint);
+  return response.data.data.portalUrl;
+};
+

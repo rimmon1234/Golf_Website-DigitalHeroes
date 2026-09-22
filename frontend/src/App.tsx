@@ -12,6 +12,9 @@ import Signup from './pages/auth/Signup.tsx';
 import DashboardPlaceholder from './pages/protected/DashboardPlaceholder.tsx';
 import ScoresPage from './pages/protected/ScoresPage.tsx';
 import MyCharityPage from './pages/protected/MyCharityPage.tsx';
+import SubscriptionPage from './pages/protected/SubscriptionPage.tsx';
+import SubscriptionSuccessPage from './pages/protected/SubscriptionSuccessPage.tsx';
+import SubscriptionCancelPage from './pages/protected/SubscriptionCancelPage.tsx';
 import AdminPlaceholder from './pages/protected/AdminPlaceholder.tsx';
 import Unauthorized from './pages/public/Unauthorized.tsx';
 import NotFound from './pages/public/NotFound.tsx';
@@ -54,6 +57,30 @@ export const App: React.FC = () => {
             element={
               <ProtectedRoute>
                 <MyCharityPage />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/subscription"
+            element={
+              <ProtectedRoute>
+                <SubscriptionPage />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/subscription/success"
+            element={
+              <ProtectedRoute>
+                <SubscriptionSuccessPage />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/subscription/cancel"
+            element={
+              <ProtectedRoute>
+                <SubscriptionCancelPage />
               </ProtectedRoute>
             }
           />

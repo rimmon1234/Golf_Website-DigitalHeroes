@@ -182,3 +182,83 @@ API Response (200 OK)
 React UI State Update (MyCharityPage.tsx / DashboardPlaceholder.tsx)
    │ (Confirmation banner, updated designated charity preview)
 ```
+
+---
+
+## 5. Phase 4: Subscriptions, Stripe Payments & Gating Architecture
+
+### Stripe Subscription & Checkout Lifecycle
+
+```
+Member Browser (/subscription)
+   │ (Selects Monthly $19/mo or Yearly $190/yr)
+   ▼
+POST /api/subscriptions/checkout { planType: 'monthly' | 'yearly' }
+   │ (Authenticated via Bearer JWT)
+   ▼
+Backend StripeService.createCheckoutSession
+   │ - Finds or creates Stripe Customer with user_id in metadata
+   │ - Resolves server-side price ID (STRIPE_MONTHLY_PRICE_ID / STRIPE_YEARLY_PRICE_ID)
+   │ - Creates Stripe Checkout Session in subscription mode
+   ▼
+Stripe Hosted Checkout / Mock Sandbox URL
+   │ - Member completes credit card payment in test mode
+   ▼
+Redirect to /subscription/success?session_id=...
+   │ - Success page polls /api/subscriptions/me until webhook sync completes
+```
+
+### Stripe Webhook & Synchronization Architecture
+
+```
+Stripe Cloud Infrastructure
+   │ (Webhook Event POST /api/payments/webhook)
+   ▼
+Express Raw Body Parser (`express.raw({ type: 'application/json' })`)
+   │ Mounted BEFORE express.json() to preserve byte-exact payload
+   ▼
+WebhookService.constructEvent
+   │ Cryptographically verifies HMAC-SHA256 signature using STRIPE_WEBHOOK_SECRET
+   │ Rejects invalid/forged payloads with HTTP 400 Bad Request
+   ▼
+WebhookService.isEventProcessed (Idempotency Guard)
+   │ Checks memory cache and stripe_webhook_events table
+   │ Prevents duplicate payment recordings or double increments
+   ▼
+Event Router:
+   ├── customer.subscription.created / updated
+   │     └── Upserts public.subscriptions with status, plan, period dates
+   ├── customer.subscription.deleted
+   │     └── Marks subscription as 'cancelled', preserves row for historical audit
+   ├── invoice.paid
+   │     ├── Inserts payment ledger record into public.payments
+   │     └── Snapshots user's charity preference & percentage into subscription_charity_allocations
+   └── invoice.payment_failed
+         └── Updates subscription status to 'past_due'
+```
+
+### Subscription Gating Middleware (`requireActiveSubscription`)
+
+```
+Authenticated HTTP Request (e.g. GET /api/scores)
+   │
+   ▼
+authenticateUser Middleware (Extracts req.user)
+   │
+   ▼
+requireActiveSubscription Middleware
+   │ Checks subscription status in public.subscriptions
+   │
+   ├── User has NO subscription OR status != 'active' OR period expired
+   │     └── Returns HTTP 403 Forbidden:
+   │         {
+   │           "status": "error",
+   │           "statusCode": 403,
+   │           "code": "SUBSCRIPTION_REQUIRED",
+   │           "message": "An active subscription is required to access score tracking..."
+   │         }
+   │
+   └── User has active subscription (current_period_end > now())
+         └── Calls next() -> Controller executes score operation
+```
+

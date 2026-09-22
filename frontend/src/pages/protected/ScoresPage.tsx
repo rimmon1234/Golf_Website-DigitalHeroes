@@ -1,4 +1,5 @@
 import React, { useEffect, useState, useCallback } from 'react';
+import { Link } from 'react-router-dom';
 import Navbar from '../../components/layout/Navbar.tsx';
 import Footer from '../../components/layout/Footer.tsx';
 import ScoreForm from '../../components/scores/ScoreForm.tsx';
@@ -8,7 +9,7 @@ import DeleteScoreDialog from '../../components/scores/DeleteScoreDialog.tsx';
 import ErrorState from '../../components/common/ErrorState.tsx';
 import { getScores, addScore, updateScore, deleteScore } from '../../services/api.ts';
 import { Score, CreateScoreInput, UpdateScoreInput } from '../../types/score.js';
-import { Trophy, CheckCircle } from 'lucide-react';
+import { Trophy, CheckCircle, Sparkles, ArrowRight } from 'lucide-react';
 
 export const ScoresPage: React.FC = () => {
   const [scores, setScores] = useState<Score[]>([]);
@@ -22,14 +23,23 @@ export const ScoresPage: React.FC = () => {
   const [deletingScore, setDeletingScore] = useState<Score | null>(null);
   const [isDeleting, setIsDeleting] = useState<boolean>(false);
 
+  const [subscriptionRequired, setSubscriptionRequired] = useState<boolean>(false);
+
   const fetchScores = useCallback(async () => {
     setLoading(true);
     setError(null);
+    setSubscriptionRequired(false);
     try {
       const data = await getScores();
       setScores(data);
-    } catch (err) {
-      setError(err instanceof Error ? err.message : 'Unable to load your scores.');
+    } catch (err: unknown) {
+      const status = (err as { response?: { status?: number; data?: { code?: string } } })?.response?.status;
+      const code = (err as { response?: { data?: { code?: string } } })?.response?.data?.code;
+      if (status === 403 && code === 'SUBSCRIPTION_REQUIRED') {
+        setSubscriptionRequired(true);
+      } else {
+        setError(err instanceof Error ? err.message : 'Unable to load your scores.');
+      }
     } finally {
       setLoading(false);
     }
@@ -125,8 +135,30 @@ export const ScoresPage: React.FC = () => {
           </div>
         )}
 
+        {/* Subscription Gate Card */}
+        {subscriptionRequired && (
+          <div className="bg-slate-900/90 border-2 border-brand-500/40 rounded-3xl p-8 sm:p-12 text-center max-w-xl mx-auto shadow-2xl shadow-brand-500/10">
+            <div className="w-16 h-16 rounded-3xl bg-brand-500/10 text-brand-400 flex items-center justify-center mx-auto mb-6">
+              <Sparkles className="w-8 h-8" />
+            </div>
+            <h2 className="text-2xl sm:text-3xl font-bold font-display text-white mb-3">
+              Active Membership Required
+            </h2>
+            <p className="text-sm text-slate-300 leading-relaxed mb-8">
+              Stableford score tracking and monthly prize draw entries are exclusive to active Digital Heroes members. Subscribe now to start recording your rounds and directing charity impact.
+            </p>
+            <Link
+              to="/subscription"
+              className="inline-flex items-center justify-center gap-2 w-full sm:w-auto py-3.5 px-8 rounded-2xl text-sm font-bold bg-gradient-to-r from-brand-500 to-emerald-400 text-slate-950 hover:brightness-110 transition shadow-lg shadow-brand-500/20"
+            >
+              <span>Choose a Membership Plan</span>
+              <ArrowRight className="w-4 h-4" />
+            </Link>
+          </div>
+        )}
+
         {/* Main Content */}
-        {!loading && !error && (
+        {!loading && !error && !subscriptionRequired && (
           <div className="space-y-8">
             {/* Record Score Form */}
             <ScoreForm onSubmitScore={handleAddScore} isSubmitting={isSubmitting} />

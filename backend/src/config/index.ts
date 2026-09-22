@@ -16,7 +16,10 @@ const envSchema = z.object({
   SUPABASE_PUBLISHABLE_KEY: z.string().optional().default(''),
   SUPABASE_SECRET_KEY: z.string().optional().default(''),
   STRIPE_SECRET_KEY: z.string().optional().default(''),
-  STRIPE_WEBHOOK_SECRET: z.string().optional().default('')
+  STRIPE_WEBHOOK_SECRET: z.string().optional().default(''),
+  STRIPE_MONTHLY_PRICE_ID: z.string().optional().default(''),
+  STRIPE_YEARLY_PRICE_ID: z.string().optional().default(''),
+  STRIPE_BILLING_PORTAL_CONFIGURATION_ID: z.string().optional().default('')
 });
 
 const parsedEnv = envSchema.safeParse(process.env);

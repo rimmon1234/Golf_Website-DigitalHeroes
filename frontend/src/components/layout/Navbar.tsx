@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { useAuth } from '../../hooks/useAuth.ts';
-import { Menu, X, User, LogOut, Shield, LogIn, ArrowRight, Trophy, Heart } from 'lucide-react';
+import { Menu, X, User, LogOut, Shield, LogIn, ArrowRight, Trophy, Heart, CreditCard } from 'lucide-react';
 
 export const Navbar: React.FC = () => {
   const [mobileMenuOpen, setMobileMenuOpen] = useState<boolean>(false);
@@ -115,6 +115,16 @@ export const Navbar: React.FC = () => {
               >
                 <Heart className="w-3.5 h-3.5 text-rose-400" /> My Charity
               </Link>
+              <Link
+                to="/subscription"
+                className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-semibold transition ${
+                  isActive('/subscription')
+                    ? 'bg-slate-800 text-brand-300'
+                    : 'text-slate-300 hover:text-white hover:bg-slate-900'
+                }`}
+              >
+                <CreditCard className="w-3.5 h-3.5 text-emerald-400" /> Membership
+              </Link>
               {profile?.role === 'admin' && (
                 <Link
                   to="/admin"
@@ -210,6 +220,12 @@ export const Navbar: React.FC = () => {
                   className="flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl text-sm font-medium text-slate-300 bg-slate-900 hover:bg-slate-800"
                 >
                   <Heart className="w-4 h-4 text-rose-400" /> My Charity Partner
+                </Link>
+                <Link
+                  to="/subscription"
+                  className="flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl text-sm font-medium text-slate-300 bg-slate-900 hover:bg-slate-800"
+                >
+                  <CreditCard className="w-4 h-4 text-emerald-400" /> Membership & Billing
                 </Link>
                 {profile?.role === 'admin' && (
                   <Link
